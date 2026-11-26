@@ -1,0 +1,33 @@
+{
+  "name": "@daymark/platform-adapters",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts src/bin.ts --dts --format esm --clean",
+    "typecheck": "tsc --noEmit",
+    "pack:platforms": "node dist/bin.mjs pack",
+    "verify:packages": "node dist/bin.mjs verify",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@daymark/contracts": "workspace:*",
+    "@daymark/skills": "workspace:*",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@daymark/config": "workspace:*",
+    "@daymark/mcp-server": "workspace:*",
+    "@daymark/storage-sqlite": "workspace:*",
+    "@modelcontextprotocol/client": "2.4.0"
+  }
+}

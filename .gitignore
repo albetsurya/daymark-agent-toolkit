@@ -1,0 +1,25 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+backups/
+.workrhythm-tmp/
+.DS_Store
+*.zip
+
+# Internal build-pack, agent instructions, and pre-release planning files
+AGENTS.md
+AGENT_BUILD_PROMPT.md
+WORKRHYTHM_COMPLETE_BLUEPRINT.md
+build-pack.json
+REPOSITORY_NAMING.md
+IMPLEMENTATION_STATUS.md
+LICENSE_DECISION.md
+assets/brand/README.md

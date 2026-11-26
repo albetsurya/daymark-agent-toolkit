@@ -1,0 +1,31 @@
+{
+  "name": "@daymark/cli",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "bin": {
+    "daymark": "./dist/bin.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts src/bin.ts --dts --format esm --clean",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@daymark/config": "workspace:*",
+    "@daymark/contracts": "workspace:*",
+    "@daymark/core": "workspace:*",
+    "@daymark/storage-sqlite": "workspace:*",
+    "commander": "15.1.0",
+    "pino": "10.4.0"
+  }
+}

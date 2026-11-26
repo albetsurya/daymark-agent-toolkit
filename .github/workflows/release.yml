@@ -1,0 +1,55 @@
+name: Release Bundles
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  package-artifacts:
+    name: Build & Checksum Release Bundles
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify quality gates
+        run: |
+          pnpm lint
+          pnpm format:check
+          pnpm typecheck
+          pnpm test
+          pnpm test:integration
+
+      - name: Pack & verify platform bundles
+        run: |
+          pnpm pack:platforms
+          pnpm verify:packages
+
+      - name: Archive platform bundles and generate SHA-256 checksums
+        run: |
+          mkdir -p dist/release
+          for dir in dist/platforms/*; do
+            name=$(basename "$dir")
+            tar -czf "dist/release/daymark-${name}.tar.gz" -C dist/platforms "$name"
+          done
+          (cd dist/release && sha256sum *.tar.gz > SHA256SUMS.txt)
+          cat dist/release/SHA256SUMS.txt
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: daymark-platform-bundles
+          path: dist/release/
