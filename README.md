@@ -2,88 +2,106 @@
 
 # Daymark Agent Toolkit
 
-Local-first task, planning, focus, and worklog toolkit shared across AI coding agents via stdio MCP and a terminal CLI.
+Local-first task, planning, focus, and worklog toolkit built around a **Shared Core** across Local AI Agents (STDIO MCP), a Standalone Web Dashboard (`127.0.0.1`), Claude Web (Remote Streamable HTTP `/mcp`), and a terminal CLI.
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-22D3EE.svg)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.12%20LTS-102A43.svg)](./package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20ESM-38BDF8.svg)](./tsconfig.base.json)
-[![MCP](https://img.shields.io/badge/MCP-SDK%20v2%20(2026--07--28%20%2B%202025)-0B1220.svg)](./docs/MCP_CONTRACT.md)
+[![MCP](https://img.shields.io/badge/MCP-STDIO%20%2B%20Streamable%20HTTP-0B1220.svg)](./docs/MCP_CONTRACT.md)
 [![Local First](https://img.shields.io/badge/Storage-Local%20SQLite-0F172A.svg)](./SECURITY.md)
 
 </div>
 
-> Note: `Daymark` (repository slug `daymark-agent-toolkit`) is a provisional working title pending trademark, domain, and npm scope checks before public release.
+> **Repository (`daymark-agent-toolkit` / `@daymark/*`):** All user surfaces share one deterministic TypeScript core (`@daymark/core`) and one local SQLite store (`daymark.sqlite`), with centralized scope checks and local path redaction for remote and browser adapters.
 
 ---
 
 ## Overview
 
-When working across multiple AI coding tools (Claude Code, OpenAI Codex, Cursor, Google Antigravity, and OpenCode), tasks and progress notes normally stay isolated inside separate chat histories. Daymark stores that state in one local SQLite database accessed through a stdio MCP server and a terminal CLI.
+When working across multiple AI coding tools (Claude Code, OpenAI Codex, Cursor, Google Antigravity, OpenCode), **Claude Web**, or a browser UI, tasks and progress notes normally stay isolated inside separate chat histories. Daymark Agent Toolkit follows **Shared Core, Multiple Interfaces**: one `@daymark/core` domain/application engine and one local SQLite database (`daymark.sqlite`) shared across:
+
+1. **Local AI Agents (MCP STDIO)** & **Terminal CLI (`daymark`)**
+2. **Standalone Web Dashboard (`apps/web`)** running locally on `127.0.0.1`
+3. **Claude Web / Remote Clients (Remote MCP via Streamable HTTP `/mcp`)**
 
 - **Shared local store:** Projects, tasks, daily plans, focus sessions, and worklogs live in one SQLite database (`daymark.sqlite`) located in your OS data directory or `DAYMARK_HOME`.
-- **Standalone CLI:** All core workflows run directly from the terminal (`daymark`) with human-readable output and `--json` mode, without requiring an AI model or cloud account.
+- **Standalone CLI & Web UI:** Run workflows from the terminal (`daymark`) or the React + TypeScript browser dashboard (`daymark-web`, bound to `127.0.0.1` with Origin + CSRF protection) without requiring an AI model or cloud account.
+- **Remote Streamable HTTP MCP (`/mcp`):** Connect Claude Web (`Customize > Connectors > Add custom connector`) over HTTPS via Cloudflare Tunnel using Bearer token or OAuth 2.1 verification, rate limiting, and `read`/`write` permission policies.
 - **Deterministic scheduling and reviews:** Task prioritization, minute-budget planning, focus durations, and daily/weekly summaries are computed in TypeScript with no LLM calls.
 - **Explicit missing fields:** Unset estimates, due dates, time budgets, and worklog gaps are reported explicitly rather than guessed or rewritten.
 - **Local privacy defaults:** Offline SQLite storage with no cloud sync, no telemetry, and no background window, browser, or editor monitoring.
 
 ---
 
+## Three Interfaces at a Glance
+
+| Interface | Transport / Entry | Security & Scope Boundary | Shared Storage |
+| --- | --- | --- | --- |
+| **Local AI Agents & CLI** | `daymark` CLI & `daymark-mcp` (STDIO) | Local OS permissions (`0700` dir, `0600` DB), explicit task/project state transitions | Local SQLite (`daymark.sqlite`) |
+| **Standalone Web Dashboard** | React 19 + TS SPA via `127.0.0.1` HTTP `/api/*` | Loopback bind, `Origin`/`Host` validation, HMAC CSRF protection, zero SQLite access in browser | Same SQLite via `@daymark/core` |
+| **Claude Web & Remote MCP** | Streamable HTTP `POST/GET /mcp` + Cloudflare Tunnel | Bearer token / OAuth-ready, rate limiting, scope policy (`read` / `write`), local path redaction | Same SQLite via `@daymark/core` |
+
+---
+
 ## Screenshots
 
-Terminal captures from running `daymark` and `daymark-mcp` locally against a SQLite database:
+Real captures from running the live **Web Dashboard** (`127.0.0.1`), **`daymark` CLI**, and **cross-surface MCP adapters** (`STDIO` + `Streamable HTTP /mcp`) against one local SQLite profile:
 
-### 1. Initialization, Diagnostics (`doctor`), and Task Capture
+### Standalone Web Dashboard (Browser UI)
+
+#### 1. Overview — Active Focus, Metrics, Explicit Data Gaps & Next Actions
+
+![Daymark Standalone Web Dashboard Overview](./assets/screenshots/05-web-dashboard-overview.png)
+
+#### 2. Daily Planning — Deterministic Minute Budget & Excluded Tasks
+
+![Daymark Web Dashboard Deterministic Daily Plan](./assets/screenshots/06-web-dashboard-daily-plan.png)
+
+#### 3. Weekly Review — Activity Intensity & Explicit Data Gaps
+
+![Daymark Web Dashboard Weekly Review](./assets/screenshots/07-web-dashboard-weekly-review.png)
+
+### Terminal CLI & Cross-Surface MCP
+
+#### 4. Initialization, Diagnostics (`doctor`), and Task Capture
 
 ![Daymark CLI initialization, doctor diagnostics, and task capture](./assets/screenshots/01-init-and-tasks-dark.png)
 
-### 2. Daily Plan and Unestimated Task Separation
+#### 5. Daily Plan and Unestimated Task Separation
 
 ![Daymark CLI deterministic daily plan](./assets/screenshots/02-daily-plan-dark.png)
 
-### 3. Focus Sessions, Worklogs, and Reviews (Light Theme)
+#### 6. Focus Sessions, Worklogs, and Reviews (Light Theme)
 
 ![Daymark CLI focus session, completion, and daily/weekly reviews](./assets/screenshots/03-focus-and-review-light.png)
 
-### 4. Cross-Agent MCP Handoff and Platform Packaging
+#### 7. Cross-Surface MCP Handoff (`STDIO` + `/mcp`) and Package Verification
 
-![Daymark MCP cross-agent handoff and package verification](./assets/screenshots/04-cross-agent-mcp-dark.png)
+![Daymark MCP cross-surface handoff and package verification](./assets/screenshots/04-cross-agent-mcp-dark.png)
 
 ---
 
 ## Architecture
 
-Domain rules reside in `@daymark/core`, persistence resides in `@daymark/storage-sqlite`, and the CLI, MCP server, and platform adapters invoke shared use cases through typed ports:
+![Daymark Architecture — Shared Core, Multiple Interfaces](./assets/architecture.svg)
 
-```text
-Claude Code ──┐
-OpenAI Codex ─┤     Portable Agent Skills + Per-Platform Config/Plugin
-Cursor ───────┤                          │
-Antigravity ──┤                          ▼
-OpenCode ─────┘            MCP Server (stdio)  /  CLI (daymark)
-                                         │
-                               Application Use Cases
-                                         │
-                             Pure Domain Core & Planner
-                                         │
-                              Repository Ports (SQLite)
-                                         │
-                         Local Daymark Store (WAL)
-```
+Domain rules reside in `@daymark/core`, persistence resides in `@daymark/storage-sqlite`, and the CLI, STDIO/HTTP MCP adapters, and standalone Web Dashboard invoke shared use cases through `@daymark/core`'s application and policy layer (`createGuardedDaymarkService`) plus storage abstraction ports (`DaymarkStore` and cloud-ready `AsyncDaymarkStore`):
 
 ### Monorepo Structure
 
 | Package / Path | Responsibility |
 |---|---|
+| [`apps/web`](./apps/web) | React 19 + TypeScript Web Dashboard + `127.0.0.1` Node HTTP API (`daymark-web`) with Origin/CSRF protection |
 | [`packages/contracts`](./packages/contracts) | Zod v4 schemas, DTOs, typed `DaymarkError` codes, backup archive schema |
 | [`packages/config`](./packages/config) | OS data/config paths, `0700`/`0600` permissions, symlink-safe file checks |
-| [`packages/core`](./packages/core) | Pure daily planner, review aggregator, task transitions, DST-safe IANA time math, use cases |
+| [`packages/core`](./packages/core) | Separated `domain/` (pure planner, reviews, rules, IANA time), `storage/` (`DaymarkStore` + `AsyncDaymarkStore`), and `application/` (use cases + `PermissionPolicy`) |
 | [`packages/storage-sqlite`](./packages/storage-sqlite) | `better-sqlite3` + Drizzle ORM schema, forward-only migrations, transactional repositories |
 | [`packages/cli`](./packages/cli) | Commander CLI (`daymark`) with human-readable output and `--json` envelopes |
-| [`packages/mcp-server`](./packages/mcp-server) | Official MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) stdio server (`daymark-mcp`) |
+| [`packages/mcp-server`](./packages/mcp-server) | Official MCP TypeScript SDK v2 (`@modelcontextprotocol/server`) supporting STDIO and Streamable HTTP (`/mcp`) |
 | [`packages/skills`](./packages/skills) | Frontmatter, tool-parity, and vendor-neutrality validator over [`skills/`](./skills) |
 | [`packages/platform-adapters`](./packages/platform-adapters) | Canonical config generator and package verifier (`pack:platforms`, `verify:packages`) |
 | [`packages/test-fixtures`](./packages/test-fixtures) | Deterministic tasks, IDs, and DST boundary fixtures |
-| [`apps/`](./apps/README.md) | Reserved for post-MVP surfaces (no web dashboard in MVP) |
+| [`deploy/cloudflare`](./deploy/cloudflare) | Cloudflare Tunnel config & env templates for Remote MCP (`daymark-mcp --http`) |
 
 ---
 
@@ -154,13 +172,35 @@ Every CLI command accepts `--json` for scripting:
 
 ---
 
-## MCP Server (`daymark-mcp`)
+## Standalone Web Dashboard (`apps/web`)
 
-The stdio MCP server exposes the 16 tools specified in [`docs/MCP_CONTRACT.md`](./docs/MCP_CONTRACT.md) with Zod v4 validation, `structuredContent`, and sanitized `isError` responses. Opt-in diagnostic logs write to `stderr` only when `DAYMARK_LOG_LEVEL` is set.
+Run the local React + TypeScript dashboard bound strictly to `127.0.0.1`:
 
 ```bash
-node packages/mcp-server/dist/bin.mjs
+pnpm build
+node apps/web/dist/server/bin.mjs --port 3456
+# Open http://127.0.0.1:3456 in your browser
 ```
+
+Includes Overview, Projects, Tasks, Daily Planning, live Focus Session timer, Worklog, and Weekly Review views backed by `@daymark/core` and the same local SQLite database (`Origin` validation + HMAC CSRF protection; zero browser SQLite access).
+
+---
+
+## MCP Server (`daymark-mcp`) — STDIO & Remote Streamable HTTP
+
+The MCP server exposes the 16 tools specified in [`docs/MCP_CONTRACT.md`](./docs/MCP_CONTRACT.md) with Zod v4 validation, `structuredContent`, centralized permission policies, and sanitized `isError` responses. Opt-in diagnostic logs write to `stderr` when `DAYMARK_LOG_LEVEL` is set.
+
+```bash
+# Local STDIO transport (default)
+node packages/mcp-server/dist/bin.mjs
+
+# Remote Streamable HTTP transport (/mcp) for Claude Web + Cloudflare Tunnel
+DAYMARK_MCP_TOKEN="replace-with-random-token" \
+DAYMARK_MCP_ALLOWED_HOSTS="daymark-mcp.yourdomain.com" \
+node packages/mcp-server/dist/bin.mjs --http --host 127.0.0.1 --port 8787
+```
+
+See [`docs/CLAUDE_WEB_INTEGRATION.md`](./docs/CLAUDE_WEB_INTEGRATION.md) for **Claude Web (`Customize > Connectors > Add custom connector`)** setup with Cloudflare Tunnel, and [`docs/CLOUD_ARCHITECTURE.md`](./docs/CLOUD_ARCHITECTURE.md) for tenant isolation and future cloud migration architecture.
 
 | Category | Tool Name | Purpose |
 |---|---|---|
@@ -282,11 +322,11 @@ Removing the CLI, MCP entries, or platform plugins leaves your SQLite database u
 ## Development and Verification
 
 ```bash
-pnpm lint               # Biome lint and import checks across packages/
+pnpm lint               # Biome lint and import checks across packages/ and apps/
 pnpm format:check       # Biome formatting check
-pnpm typecheck          # Build all 9 packages and run tsc --noEmit
+pnpm typecheck          # Build all 10 workspace projects (9 packages + apps/web) and run tsc --noEmit
 pnpm test               # Unit tests (Vitest --project unit)
-pnpm test:integration   # SQLite, CLI e2e, MCP stdio, and cross-agent integration tests
+pnpm test:integration   # SQLite, CLI e2e, Web API/CSRF, MCP STDIO/HTTP, and cross-surface integration tests
 pnpm pack:platforms     # Build platform bundles in dist/platforms/
 pnpm verify:packages    # Validate generated manifests, relative paths, and skills
 ```

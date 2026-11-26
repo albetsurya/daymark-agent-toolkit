@@ -2,9 +2,10 @@
 
 ## 1. Transport
 
-MVP uses a local `stdio` MCP server launched as a child process by the agent platform. Do not write normal logs to stdout. Use stderr for diagnostics. The MCP server and CLI open the same configured database path.
+Daymark exposes the exact same 16 tools and `@daymark/core` application services over two transports:
 
-Remote Streamable HTTP is post-MVP and requires authentication, authorization, rate limiting, audit, and deployment design.
+1. **Local `stdio` (`daymark-mcp`)**: Launched as a child process by local AI agent platforms. Logs go strictly to `stderr`; stdout carries MCP protocol frames only.
+2. **Remote Streamable HTTP (`daymark-mcp --http`, endpoint `/mcp`)**: Uses `@modelcontextprotocol/server`'s `createMcpHandler` (Streamable HTTP for modern `2026-07-28` and `2025-*` MCP clients; legacy `/sse` is not used as primary transport). Enforces Bearer/OAuth authentication, `Host`/`Origin` allowlists, body-size and `application/json` checks, sliding-window rate limiting, structured redacted logging, path redaction (`dataDir: null`), and centralized `ExecutionContext` permission policies (`read` vs `write`, with `backup` disabled remotely).
 
 ## 2. Tool naming
 

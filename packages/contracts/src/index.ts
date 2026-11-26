@@ -22,6 +22,9 @@ export const ErrorCodeSchema = z.enum([
   'IMPORT_CONFLICT',
   'BACKUP_VERSION_UNSUPPORTED',
   'CONFIRMATION_REQUIRED',
+  'UNAUTHORIZED',
+  'FORBIDDEN',
+  'RATE_LIMITED',
   'INTERNAL_ERROR',
 ]);
 
@@ -51,11 +54,13 @@ export class DaymarkError extends Error {
 
 export const AgentSourceSchema = z.enum([
   'claude-code',
+  'claude-web',
   'codex',
   'cursor',
   'antigravity',
   'opencode',
   'cli',
+  'web',
   'other',
   'unknown',
 ]);

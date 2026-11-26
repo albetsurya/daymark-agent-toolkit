@@ -11,9 +11,9 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
-    "lint": "biome check packages",
-    "format": "biome format --write packages",
-    "format:check": "biome format packages",
+    "lint": "biome check packages apps",
+    "format": "biome format --write packages apps",
+    "format:check": "biome format packages apps",
     "typecheck": "pnpm build && pnpm -r --if-present typecheck",
     "test": "vitest run --project unit",
     "test:integration": "vitest run --project integration",

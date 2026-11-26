@@ -13,8 +13,13 @@ import {
   type Clock,
   computeDailyPlan,
   createDaymarkService,
+  createGuardedDaymarkService,
+  createRemoteExecutionContext,
+  createWebExecutionContext,
   type DaymarkRepositories,
   type DaymarkStore,
+  decodeOffsetCursor,
+  encodeOffsetCursor,
   endOfLocalDayUtcMs,
   type FocusSessionRecord,
   formatUtcMsInTimezoneDate,
@@ -25,6 +30,7 @@ import {
   type TagRecord,
   type TaskRecord,
   type TaskTagRecord,
+  toAsyncDaymarkStore,
   validateTaskStatusTransition,
   type WorklogEntryRecord,
 } from './index.js';
@@ -465,5 +471,43 @@ describe('@daymark/core use cases', () => {
     expect(() => service.importBackup(backup, { mode: 'replace', confirm: false })).toThrow(
       DaymarkError,
     );
+  });
+
+  it('enforces centralized permission policies, source attribution, path redaction, and async storage adaptation', async () => {
+    const store = createInMemoryStore();
+    const { clock } = makeTestClock('2026-11-26T02:00:00Z');
+    const baseService = createDaymarkService({ store, clock, idGenerator: makeSeqIds() });
+
+    // Read-only remote context allows reads, blocks writes & backups, and redacts local dataDir
+    const readOnlyRemote = createGuardedDaymarkService(
+      baseService,
+      createRemoteExecutionContext({ scopes: ['read'] }),
+    );
+    const status = readOnlyRemote.getStatus({});
+    expect(status.initialized).toBe(true);
+    expect(status.dataDir).toBeNull();
+    expect(() => readOnlyRemote.captureTask({ title: 'Should be blocked' })).toThrow(DaymarkError);
+    expect(() => readOnlyRemote.exportBackup()).toThrow(DaymarkError);
+
+    // Web context allows read+write, defaults sourceAgent to 'web', blocks destructive backup import
+    const webService = createGuardedDaymarkService(baseService, createWebExecutionContext());
+    const captured = webService.captureTask({ title: 'Web dashboard task' });
+    expect(captured.task.sourceAgent).toBe('web');
+    expect(webService.getStatus({}).dataDir).toBeNull();
+    expect(() =>
+      webService.importBackup(baseService.exportBackup(), { mode: 'replace', confirm: true }),
+    ).toThrow(DaymarkError);
+
+    // Web-standard cursor encoding roundtrips cleanly
+    const encoded = encodeOffsetCursor(25);
+    expect(decodeOffsetCursor(encoded)).toBe(25);
+
+    // Async storage abstraction bridges sync local store cleanly without exposing local paths
+    const asyncStore = toAsyncDaymarkStore(store, { supportsLocalPaths: false });
+    expect(asyncStore.getCapabilities().persistenceModel).toBe('async');
+    expect(asyncStore.getCapabilities().supportsLocalPaths).toBe(false);
+    expect(await asyncStore.isInitialized()).toBe(true);
+    const listed = await asyncStore.transaction(async (repos) => repos.tasks.listOpen());
+    expect(listed.some((t) => t.id === captured.task.id)).toBe(true);
   });
 });

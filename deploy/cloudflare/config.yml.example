@@ -1,0 +1,31 @@
+# Cloudflare Tunnel configuration for Daymark Remote MCP (Personal Named Tunnel)
+#
+# Usage:
+#   1. Authenticate once: cloudflared tunnel login
+#   2. Create tunnel:     cloudflared tunnel create daymark-mcp
+#   3. Route DNS:         cloudflared tunnel route dns daymark-mcp daymark-mcp.yourdomain.com
+#   4. Copy to ~/.cloudflared/config.yml and replace <TUNNEL_UUID> and your domain.
+#   5. Start Daymark Remote MCP on localhost:
+#        DAYMARK_MCP_TOKEN="your-long-random-token" \
+#        DAYMARK_MCP_ALLOWED_HOSTS="daymark-mcp.yourdomain.com" \
+#        node packages/mcp-server/dist/bin.mjs --http --host 127.0.0.1 --port 8787
+#   6. Start the tunnel:
+#        cloudflared tunnel run daymark-mcp
+#
+# Security:
+#   - ONLY the Remote MCP server (127.0.0.1:8787) is routed through this tunnel.
+#   - NEVER expose the local Web Dashboard (127.0.0.1:3456) to the public internet.
+#   - Restrict ingress paths so only /mcp, /healthz, and /.well-known/* reach Node.
+
+tunnel: <TUNNEL_UUID>
+credentials-file: /home/your-user/.cloudflared/<TUNNEL_UUID>.json
+
+ingress:
+  - hostname: daymark-mcp.yourdomain.com
+    path: ^/(mcp|healthz|\.well-known/.*)$
+    service: http://127.0.0.1:8787
+    originRequest:
+      noTLSVerify: false
+  - hostname: daymark-mcp.yourdomain.com
+    service: http_status:404
+  - service: http_status:404

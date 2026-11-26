@@ -3,39 +3,38 @@
 ## 1. High-level architecture
 
 ```text
-Claude Code ─┐
-Codex ───────┤       portable Skills + per-platform package
-Cursor ──────┤                    │
-Antigravity ─┤                    ▼
-OpenCode ────┘              MCP Server / CLI
-                                  │
-                          Application Use Cases
-                                  │
-                             Domain Core
-                                  │
-                       Repository Interfaces
-                                  │
-                          SQLite Adapter
-                                  │
-                        Local Daymark Store
+Local AI Agents (STDIO) ──┐
+Standalone Web Dashboard ─┼─► Interface & Transport Adapters
+Claude Web (Remote MCP) ──┤     ├─ @daymark/cli (CLI)
+Terminal CLI (daymark) ───┘     ├─ @daymark/mcp-server (STDIO & Streamable HTTP /mcp)
+                                └─ @daymark/web (Node HTTP API 127.0.0.1 + React SPA)
+                                         │
+                             @daymark/core (Shared Core)
+                               ├─ application/ (Use cases + ExecutionContext + PermissionPolicy)
+                               ├─ domain/ (Pure planner, reviews, rules, IANA time)
+                               └─ storage/ (DaymarkStore + AsyncDaymarkStore ports)
+                                         │
+                              @daymark/storage-sqlite
+                                         │
+                                Local Daymark Store
 ```
 
-The CLI and MCP server are adapters over the same application use cases. No platform-specific code may access SQLite directly.
+All interfaces (CLI, STDIO MCP, Local Web Dashboard, and Remote Streamable HTTP MCP) execute the exact same `@daymark/core` application services and domain logic through centralized `createGuardedDaymarkService` permission checks. No interface or browser client may access SQLite directly.
 
 ## 2. Monorepo packages
 
 ```text
 apps/
-  # No web app in MVP. Reserve this directory for post-MVP surfaces.
+  web/                # Standalone React + TypeScript dashboard + local Node HTTP server (127.0.0.1)
 packages/
   contracts/          # Zod schemas, shared DTOs, errors, versioned contracts
-  core/               # Domain entities, use cases, planner, review calculations
-  storage-sqlite/     # Drizzle schema, migrations, repository implementations
+  core/               # Separated domain/, storage/ (sync & async ports), application/ (use cases + policy)
+  storage-sqlite/     # Drizzle schema, migrations, SQLite repository implementations
   cli/                # Commander CLI adapter
-  mcp-server/         # MCP stdio server adapter
+  mcp-server/         # MCP STDIO and Streamable HTTP (/mcp) server adapters
   skills/             # Portable SKILL.md workflows and references
   platform-adapters/  # Packaging/install/validation adapters per agent
-  config/             # Runtime configuration and platform-independent paths
+  config/             # Runtime configuration and OS-conventional local paths
   test-fixtures/      # Shared deterministic fixtures
 ```
 
@@ -58,8 +57,11 @@ Avoid circular dependencies. If repository interfaces create awkward imports, pl
 ### Local MCP server
 `daymark-mcp` starts an MCP server over `stdio`. It opens the same configured database. The server must not print logs to stdout because stdout is the MCP transport; diagnostics go to stderr.
 
-### Future remote MCP server
-Not in MVP. If added, use Streamable HTTP with authentication, per-user isolation, rate limiting, audit logs, and explicit deployment documentation. Never expose a local user's SQLite file directly over an unauthenticated network listener.
+### Local Web Dashboard (`apps/web`)
+`daymark-web` binds strictly to `127.0.0.1` (default port `3456`) and serves a React + TypeScript SPA backed by a Node.js HTTP API (`/api/*`). Every API request validates `Host`/`Origin` headers and requires an HMAC-bound CSRF token (`GET /api/csrf` + `HttpOnly; SameSite=Strict` cookie + `X-CSRF-Token`) on mutations. Browser code never touches SQLite directly and `dataDir` is redacted (`null`).
+
+### Remote MCP Server (Streamable HTTP `/mcp`)
+`daymark-mcp --http` serves MCP over Streamable HTTP at `/mcp` via `@modelcontextprotocol/server` (`createMcpHandler`), supporting Bearer token authentication (`DAYMARK_MCP_TOKEN`, optional read-only `DAYMARK_MCP_READONLY_TOKEN`) and multi-user OAuth 2.1 verifier integration (`/.well-known/oauth-protected-resource/mcp`), rate limiting, body/MIME validation, `Host`/`Origin` validation, `dataDir` redaction, and centralized permission policy checks. See [`docs/CLAUDE_WEB_INTEGRATION.md`](./CLAUDE_WEB_INTEGRATION.md) and [`docs/CLOUD_ARCHITECTURE.md`](./CLOUD_ARCHITECTURE.md).
 
 ## 4. Local filesystem layout
 

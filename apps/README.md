@@ -1,4 +1,3 @@
-# Reserved for Post-MVP Apps
+# Applications (`apps/`)
 
-Per `docs/ROADMAP.md` and `docs/DECISIONS.md` (ADR-004), no web dashboard or mobile app is scaffolded during MVP.
-This directory is intentionally reserved for post-MVP application surfaces once the CLI, SQLite storage, MCP server, and Agent Skills are validated.
+- [`apps/web`](./web): Standalone React + TypeScript Web Dashboard served by a local Node.js HTTP server bound strictly to `127.0.0.1` (`daymark-web`). Communicates exclusively through `/api/*` using `@daymark/core` and `@daymark/storage-sqlite` with Host/Origin checks and HMAC CSRF protection.

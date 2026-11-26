@@ -5,7 +5,7 @@ import type {
   WeeklyReviewOutput,
   WeekStartsOn,
 } from '@daymark/contracts';
-import type { FocusSessionRecord, TaskRecord, WorklogEntryRecord } from './ports.js';
+import type { FocusSessionRecord, TaskRecord, WorklogEntryRecord } from './records.js';
 import {
   getPriorityWeight,
   toFocusSessionDto,

@@ -5,7 +5,7 @@ import type {
   PlanRuleReason,
   Priority,
 } from '@daymark/contracts';
-import type { TaskRecord } from './ports.js';
+import type { TaskRecord } from './records.js';
 import { getPriorityWeight, toTaskSummaryDto } from './rules.js';
 import {
   formatUtcMsInTimezoneDate,

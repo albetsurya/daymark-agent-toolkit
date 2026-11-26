@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Shared Core Layering (`@daymark/core`, `ADR-013`)**: Separated `domain/`, `storage/` (`DaymarkStore` + cloud-ready `AsyncDaymarkStore` + `TenantContext`), and `application/` (`ExecutionContext`, `PermissionPolicy`, `createGuardedDaymarkService`) with zero filesystem path or Node `Buffer` dependencies in core.
+- **Standalone Web Dashboard (`@daymark/web`, `apps/web`)**: React 19 + TypeScript SPA backed by a loopback-only (`127.0.0.1`) Node HTTP API (`daymark-web`) with `Host`/`Origin` validation, HMAC CSRF protection, and Overview, Projects, Tasks, Daily Plan, Focus Session, Worklog, and Weekly Review views.
+- **Remote Streamable HTTP MCP (`@daymark/mcp-server`)**: Added `/mcp` Streamable HTTP adapter (`daymark-mcp --http`) using `@modelcontextprotocol/server` `createMcpHandler`, Bearer/OAuth 2.1 authentication, RFC 9728 metadata, sliding-window rate limiting, body/MIME validation, redacted logs, and `read`/`write` permission policies.
+- **Deployment & Architecture Docs**: Added Cloudflare Tunnel configuration templates (`deploy/cloudflare/`), [`docs/CLAUDE_WEB_INTEGRATION.md`](./docs/CLAUDE_WEB_INTEGRATION.md), and [`docs/CLOUD_ARCHITECTURE.md`](./docs/CLOUD_ARCHITECTURE.md).
+
 ## [0.1.0] - 2026-11-26
 
 ### Added

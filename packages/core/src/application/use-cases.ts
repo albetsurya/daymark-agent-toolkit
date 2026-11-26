@@ -63,14 +63,8 @@ import {
   type WeeklyReviewOutput,
 } from '@daymark/contracts';
 import type * as z from 'zod';
-import { computeDailyPlan } from './planner.js';
-import {
-  type DaymarkRepositories,
-  type DaymarkStore,
-  decodeOffsetCursor,
-  encodeOffsetCursor,
-} from './ports.js';
-import { computeDailyReview, computeWeeklyReview } from './reviews.js';
+import { computeDailyPlan } from '../domain/planner.js';
+import { computeDailyReview, computeWeeklyReview } from '../domain/reviews.js';
 import {
   normalizeTags,
   toFocusSessionDto,
@@ -79,7 +73,7 @@ import {
   toTaskSummaryDto,
   toWorklogEntryDto,
   validateTaskStatusTransition,
-} from './rules.js';
+} from '../domain/rules.js';
 import {
   type Clock,
   cryptoIdGenerator,
@@ -93,7 +87,13 @@ import {
   startOfLocalDayUtcMs,
   systemClock,
   toIsoUtc,
-} from './time.js';
+} from '../domain/time.js';
+import {
+  type DaymarkRepositories,
+  type DaymarkStore,
+  decodeOffsetCursor,
+  encodeOffsetCursor,
+} from '../storage/ports.js';
 
 function parseWithSchema<T extends z.ZodType>(schema: T, input: unknown): z.infer<T> {
   const result = schema.safeParse(input);

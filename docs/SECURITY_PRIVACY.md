@@ -40,6 +40,14 @@
 - Do not log task titles, descriptions, worklog details, note content, auth tokens, or environment values by default.
 - Diagnostic verbose mode must be explicit and warn that it may include metadata.
 
-## 6. Future remote mode
+## 6. Local Web Dashboard & Remote MCP controls
 
-Any future hosted/remote mode requires a separate threat model and design for authentication, authorization, tenant isolation, encryption in transit/at rest, secret management, rate limiting, audit trails, deletion/export rights, backup/restore, and incident response. Do not bolt remote HTTP onto the local MCP server without those controls.
+- **Local Web Dashboard (`apps/web`):**
+  - Binds strictly to loopback interfaces (`127.0.0.1` default; non-loopback binds rejected).
+  - Validates `Host`, `Origin`, and `Sec-Fetch-Site` headers; enforces `HttpOnly; SameSite=Strict` cookie + HMAC `X-CSRF-Token` verification on all mutating HTTP API routes.
+  - Browser code never reads SQLite directly; `/api/status` redacts `dataDir` (`null`) and destructive backup import/export routes are omitted from the web HTTP surface.
+- **Remote MCP Server (`daymark-mcp --http`):**
+  - Binds to `127.0.0.1` behind HTTPS reverse proxy / Cloudflare Tunnel (`deploy/cloudflare/config.yml.example`).
+  - Requires Bearer token (`Authorization: Bearer <token>`) verified via timing-safe SHA-256 comparison or an `OAuthTokenVerifier`, returning `401` with `WWW-Authenticate` on missing/invalid credentials.
+  - Enforces `@daymark/core` `PermissionPolicy` (`read` vs `write`, blocking `backup` and destructive operations remotely), `Host`/`Origin` allowlists, `1 MiB` payload limit, `application/json` validation, sliding-window rate limiting (`429`), redacted `pino` logs, and `dataDir: null` path redaction.
+  - Never exposes raw SQLite files or `/db` / `/sqlite` / `/export` endpoints.

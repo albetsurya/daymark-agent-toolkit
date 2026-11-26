@@ -11,7 +11,14 @@ import {
   writeProfileConfig,
 } from '@daymark/config';
 import { DaymarkError, type SettingsDto, type WeekStartsOn } from '@daymark/contracts';
-import { assertValidTimezone, type DaymarkRepositories, type DaymarkStore } from '@daymark/core';
+import {
+  type AsyncDaymarkStore,
+  assertValidTimezone,
+  type DaymarkRepositories,
+  type DaymarkStore,
+  type StorageCapabilities,
+  toAsyncDaymarkStore,
+} from '@daymark/core';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { getLatestAppliedMigration, runMigrations } from './migrator.js';
@@ -161,6 +168,7 @@ export function initializeProfile(options: InitializeProfileOptions = {}): Initi
 export interface ManagedDaymarkStore extends DaymarkStore {
   close(): void;
   getRawDatabase(): Database.Database | null;
+  getCapabilities(): StorageCapabilities;
 }
 
 /**
@@ -198,6 +206,15 @@ export function openDaymarkStore(paths: DaymarkPaths = resolveDaymarkPaths()): M
       if (!c) return null;
       return getLatestAppliedMigration(c.raw);
     },
+    getCapabilities() {
+      return {
+        backendKind: 'sqlite-local',
+        transactional: true,
+        multiTenant: false,
+        supportsLocalPaths: true,
+        persistenceModel: 'sync',
+      };
+    },
     transaction<T>(fn: (repos: DaymarkRepositories) => T): T {
       const c = ensureConnection();
       if (!c) {
@@ -221,5 +238,16 @@ export function openDaymarkStore(paths: DaymarkPaths = resolveDaymarkPaths()): M
     getRawDatabase() {
       return ensureConnection()?.raw ?? null;
     },
+  };
+}
+
+export function openAsyncDaymarkStore(
+  paths: DaymarkPaths = resolveDaymarkPaths(),
+): AsyncDaymarkStore & { close(): void } {
+  const syncStore = openDaymarkStore(paths);
+  const asyncStore = toAsyncDaymarkStore(syncStore);
+  return {
+    ...asyncStore,
+    close: () => syncStore.close(),
   };
 }

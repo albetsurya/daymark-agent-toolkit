@@ -8,7 +8,12 @@ import {
   type TaskSummaryDto,
   type WorklogEntryDto,
 } from '@daymark/contracts';
-import type { FocusSessionRecord, ProjectRecord, TaskRecord, WorklogEntryRecord } from './ports.js';
+import type {
+  FocusSessionRecord,
+  ProjectRecord,
+  TaskRecord,
+  WorklogEntryRecord,
+} from './records.js';
 import { resolveEffectiveDueAtMs, toIsoUtc } from './time.js';
 
 const ALLOWED_TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
