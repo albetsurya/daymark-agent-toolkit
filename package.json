@@ -1,9 +1,9 @@
 {
-  "name": "day-mark-monorepo",
+  "name": "daymark-agent-toolkit",
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "Daymark - local-first, cross-agent productivity toolkit (working title)",
+  "description": "Daymark Agent Toolkit - local-first, cross-agent productivity toolkit (working title)",
   "type": "module",
   "packageManager": "pnpm@12.16.1",
   "engines": {

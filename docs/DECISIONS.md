@@ -99,6 +99,6 @@ A change to product scope, public MCP tool name, persisted data model, platform 
 
 ### ADR-012 — Product rename from Daybook to Daymark (2026-11-26)
 
-**Context:** Pre-release naming review replaced the working title `Daybook` with `Daymark` (repository slug `day-mark`) via `day-mark-build-pack` (`REPOSITORY_NAMING.md`) to avoid product/trademark collision.  
+**Context:** Pre-release naming review replaced the working title `Daybook` with `Daymark` (repository slug `daymark-agent-toolkit`) via `daymark-agent-toolkit-build-pack` (`REPOSITORY_NAMING.md`) to avoid product/trademark collision.  
 **Decision:** Adopt canonical Daymark identifiers across the entire pre-release codebase: CLI `daymark`, MCP binary `daymark-mcp`, MCP tool prefix `daymark_*`, npm workspace scope `@daymark/*`, env vars `DAYMARK_HOME` / `DAYMARK_DATABASE_PATH` / `DAYMARK_LOG_LEVEL`, data directories (`daymark` on Linux XDG, `Daymark` on macOS/Windows), and SQLite filename `daymark.sqlite`. Because no public release or user profile data exists yet, apply clean Daymark identifiers directly without adding legacy `daybook` migration paths (`REPOSITORY_NAMING.md`).  
 **Consequences:** All 16 MCP tool names, workspace package names, config paths, skills, and platform adapters use consistent `Daymark` naming without altering domain logic or SQLite table schemas.

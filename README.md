@@ -1,6 +1,6 @@
 <div align="center">
 
-# Daymark
+# Daymark Agent Toolkit
 
 Local-first task, planning, focus, and worklog toolkit shared across AI coding agents via stdio MCP and a terminal CLI.
 
@@ -12,7 +12,7 @@ Local-first task, planning, focus, and worklog toolkit shared across AI coding a
 
 </div>
 
-> Note: `Daymark` (repository slug `day-mark`) is a provisional working title pending trademark, domain, and npm scope checks before public release.
+> Note: `Daymark` (repository slug `daymark-agent-toolkit`) is a provisional working title pending trademark, domain, and npm scope checks before public release.
 
 ---
 
