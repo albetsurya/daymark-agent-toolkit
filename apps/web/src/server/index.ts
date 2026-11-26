@@ -138,6 +138,7 @@ function errorCodeToHttpStatus(code: ErrorCode): number {
     case 'RATE_LIMITED':
       return 429;
     case 'DATABASE_BUSY':
+    case 'DATABASE_CORRUPT':
       return 503;
     default:
       return 500;

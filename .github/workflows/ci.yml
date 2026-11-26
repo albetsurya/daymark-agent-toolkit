@@ -56,3 +56,5 @@ jobs:
         run: |
           pnpm pack:platforms
           pnpm verify:packages
+          pnpm verify:release
+          pnpm verify:matrix

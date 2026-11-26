@@ -19,6 +19,7 @@ import {
 } from './tools.js';
 
 export * from './http.js';
+export * from './rate-limit.js';
 export * from './tools.js';
 
 export interface DaymarkMcpServerOptions {

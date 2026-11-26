@@ -42,6 +42,15 @@ When moving from a single-user local SQLite file to a shared multi-user database
 
 ---
 
+## 3.1 Distributed Rate Limiting Abstraction
+
+Remote HTTP MCP (`@daymark/mcp-server`) defines a storage-agnostic async `RateLimiter` interface in [`packages/mcp-server/src/rate-limit.ts`](../packages/mcp-server/src/rate-limit.ts):
+
+- **Single-process personal deployments:** Default to `createMemoryRateLimiter(config)` (sliding window in process `Map`), appropriate for localhost + Cloudflare Tunnel on one Node.js process.
+- **Multi-instance / SaaS deployments:** Pass a shared external `rateLimiter` implementation to `createDaymarkHttpMcpHandler({ rateLimiter })` / `startDaymarkHttpServer({ rateLimiter })` backed by Redis, Cloudflare Workers KV, or Durable Objects so rate-limit counters and `Retry-After` enforcement synchronize consistently across horizontal server instances.
+
+---
+
 ## 4. Why SQLite (`better-sqlite3`) Cannot Be Swapped 1:1 with D1 / Turso Without Adjustments
 
 Even though Cloudflare D1 and Turso speak SQLite SQL syntax, treating them as drop-in replacements for `better-sqlite3` causes real production bugs:

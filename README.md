@@ -121,6 +121,14 @@ pnpm test
 pnpm test:integration
 ```
 
+To install `daymark`, `daymark-mcp`, and `daymark-web` wrappers locally into `~/.local/bin` without publishing to public npm yet:
+
+```bash
+./scripts/install-local.sh
+```
+
+See [`docs/RELEASE_STRATEGY.md`](./docs/RELEASE_STRATEGY.md) for the npm `@daymark/*` distribution topology, tarball verification (`pnpm verify:release`), and public registry roadmap.
+
 ### 2. Initialize a Local Profile
 
 ```bash
@@ -225,7 +233,7 @@ See [`docs/CLAUDE_WEB_INTEGRATION.md`](./docs/CLAUDE_WEB_INTEGRATION.md) for **C
 
 ## Cross-Agent Compatibility (`2026-11-26`)
 
-Generate bundles for all five platforms from the canonical adapter config:
+Generate bundles for all five platforms from the canonical adapter config and check live host tool availability honestly:
 
 ```bash
 # Portable bundles (uses `daymark-mcp` on PATH)
@@ -236,15 +244,22 @@ pnpm --filter @daymark/platform-adapters exec node dist/bin.mjs pack --local
 
 # Verify generated manifests, relative paths, and skills
 pnpm verify:packages
+
+# Check host binary availability and run cross-platform matrix checks
+pnpm verify:matrix
 ```
+
+> **Verification policy:** A platform is marked `verified` only after running end-to-end against the real client/app. When a proprietary CLI (`claude`, `codex`, `cursor`) or external cloud account (`claude.ai`) is absent from the build host, status strictly stays `smoke-tested` — see [`docs/PLATFORM_VERIFICATION_EVIDENCE.md`](./docs/PLATFORM_VERIFICATION_EVIDENCE.md).
 
 | Platform | Status | Tier 1 (MCP + Skills) | Tier 2 (Native Bundle) | Verification Notes (`2026-11-26`) |
 |---|---|---|---|---|
 | Google Antigravity | `verified` | `mcp_config.json` + `skills/` | `.antigravity-plugin/plugin.json` | Installed via `agy plugin install`, passed `agy plugin validate --strict --json` (`agy 1.5.17`), and ran live prompt creating project and task via MCP. |
 | OpenCode | `verified` | `opencode.json` + `.opencode/skills/` | `opencode.json` (`mcp.servers.daymark`) | Validated via `opencode debug config` (`opencode v2.2.5`) and ran `opencode --standalone run` updating Antigravity's task, logging work, and generating a daily plan on the shared DB. |
-| Claude Code | `smoke-tested` | `.mcp.json` + `skills/` | `.claude-plugin/plugin.json` | Schema checked and `.mcp.json` tested against shared SQLite DB in integration tests (`claude` CLI absent on build host). |
-| OpenAI Codex | `smoke-tested` | `config.toml.snippet` + `skills/` | `.codex-plugin/plugin.json` + `.mcp.json` | Schema checked and `.mcp.json` tested against shared SQLite DB in integration tests (`codex` CLI absent on build host). |
-| Cursor | `smoke-tested` | `mcp.json` + `skills/` | `cursor-agent-plugin/` & `cursor-native/` | Both `plugin.json` and `.cursor-plugin/plugin.json` checked and `mcp.json` tested against shared DB (`cursor` app absent on build host). |
+| Standalone Web Dashboard | `verified` | `127.0.0.1` HTTP API + React SPA | Built `apps/web` server + Vite bundle | Verified Origin/Host checks, HMAC CSRF protection, and live Chromium renders across Overview, Daily Plan, and Weekly Review views. |
+| Claude Code | `smoke-tested` | `.mcp.json` + `skills/` | `.claude-plugin/plugin.json` | Manifest validated and `.mcp.json` tested via `StdioClientTransport` against shared SQLite DB (`claude` CLI absent on build host). |
+| OpenAI Codex | `smoke-tested` | `config.toml.snippet` + `skills/` | `.codex-plugin/plugin.json` + `.mcp.json` | Manifest validated and `.mcp.json` tested via `StdioClientTransport` against shared SQLite DB (`codex` CLI absent on build host). |
+| Cursor | `smoke-tested` | `mcp.json` + `skills/` | `cursor-agent-plugin/` & `cursor-native/` | Manifest validated and `mcp.json` tested via `StdioClientTransport` against shared DB (`cursor` app absent on build host). |
+| Claude Web (Remote MCP) | `smoke-tested` | Streamable HTTP `/mcp` + Cloudflare config | RFC 9728 OAuth metadata + Bearer policy | Local `/mcp` + `StreamableHTTPClientTransport` integration tests pass; live `claude.ai` UI registration requires an external Anthropic account + HTTPS tunnel. |
 
 <details>
 <summary>Platform setup commands (Antigravity, OpenCode, Claude Code, Codex, Cursor)</summary>
@@ -290,13 +305,16 @@ Prompt evaluation test cases are documented in [`packages/skills/EVAL_CHECKLIST.
 
 ## Backups, Security, and Uninstall
 
-### Backups and Migrations
+### Backups, Integrity Checks, and Migrations
 
-Export a backup before running schema upgrades:
+Export a backup before running schema upgrades, check SQLite integrity with `daymark doctor`, and follow [`docs/DISASTER_RECOVERY.md`](./docs/DISASTER_RECOVERY.md) if corruption recovery is needed:
 
 ```bash
 # Export a versioned JSON backup (0600 permissions on POSIX)
 node packages/cli/dist/bin.mjs export ./daymark-backup.json
+
+# Verify database integrity (detects DATABASE_CORRUPT cleanly without data loss)
+node packages/cli/dist/bin.mjs doctor
 
 # Validate schemas, IDs, relationships, and conflicts without mutating the DB
 node packages/cli/dist/bin.mjs import ./daymark-backup.json --dry-run --mode replace
@@ -326,9 +344,11 @@ pnpm lint               # Biome lint and import checks across packages/ and apps
 pnpm format:check       # Biome formatting check
 pnpm typecheck          # Build all 10 workspace projects (9 packages + apps/web) and run tsc --noEmit
 pnpm test               # Unit tests (Vitest --project unit)
-pnpm test:integration   # SQLite, CLI e2e, Web API/CSRF, MCP STDIO/HTTP, and cross-surface integration tests
+pnpm test:integration   # SQLite corruption/recovery/shutdown, CLI e2e, Web API/CSRF, MCP STDIO/HTTP, and cross-surface integration tests
 pnpm pack:platforms     # Build platform bundles in dist/platforms/
 pnpm verify:packages    # Validate generated manifests, relative paths, and skills
+pnpm verify:release     # Pack all 9 publishable @daymark/* tarballs and validate resolved dependencies + binaries
+pnpm verify:matrix      # Detect host agent CLIs and validate cross-platform matrix status without premature claims
 ```
 
 ---

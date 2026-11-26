@@ -182,5 +182,21 @@ describe('@daymark/cli end-to-end workflow', () => {
     const elapsedMs = Date.now() - tStart;
     expect(JSON.parse(rawOut).data.initialized).toBe(true);
     expect(elapsedMs).toBeLessThan(2000);
+
+    // 8. Doctor reports databaseIntegrity ok cleanly, and detects corrupt files safely
+    const healthyDoctor = await execCli(['doctor', '--json'], home2);
+    expect(healthyDoctor.code).toBe(0);
+    expect(JSON.parse(healthyDoctor.stdout).data.databaseIntegrity).toBe('ok');
+
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(join(home2, 'daymark.sqlite'), 'NOT_A_VALID_SQLITE_HEADER');
+    const corruptDoctor = await execCli(['doctor', '--json'], home2);
+    expect(corruptDoctor.code).toBe(0);
+    const corruptData = JSON.parse(corruptDoctor.stdout).data as {
+      databaseIntegrity: string;
+      initialized: boolean;
+    };
+    expect(corruptData.databaseIntegrity).toBe('corrupt');
+    expect(corruptData.initialized).toBe(false);
   });
 });

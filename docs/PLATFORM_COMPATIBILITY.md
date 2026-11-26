@@ -133,4 +133,6 @@ Do not claim a platform is fully verified without running this matrix in the act
 | **Standalone Web Dashboard** | `verified` | React 19 + TypeScript SPA (`apps/web`) backed by `127.0.0.1` Node HTTP API (`/api/*`) calling `@daymark/core`. | Built client (`vite`) + server (`tsdown`) and verified origin validation, CSRF protection, all 7 dashboard workflows, and live tri-surface DB sharing (`2026-11-26`). | Verified via automated integration suite (`apps/web/src/server/web-server.integration.test.ts`) and live local HTTP smoke test. |
 | **Claude Web (Remote MCP)** | `smoke-tested` | Streamable HTTP `/mcp` (`daymark-mcp --http`) verified locally with official `StreamableHTTPClientTransport`, Bearer/OAuth auth, rate limits, `read`/`write` permission policy, and path redaction (`2026-11-26`). | Cloudflare Tunnel configs provided (`deploy/cloudflare/config.yml.example`); connector setup documented in [`docs/CLAUDE_WEB_INTEGRATION.md`](./CLAUDE_WEB_INTEGRATION.md). | Automated Streamable HTTP integration tests pass locally; live `claude.ai` cloud connector UI registration requires an external Anthropic account + live HTTPS tunnel outside this host. |
 
+See [`docs/PLATFORM_VERIFICATION_EVIDENCE.md`](./PLATFORM_VERIFICATION_EVIDENCE.md) for host binary detection results (`pnpm verify:matrix`) and remaining live validation prerequisites.
+
 

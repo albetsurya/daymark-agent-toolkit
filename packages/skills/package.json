@@ -1,9 +1,25 @@
 {
   "name": "@daymark/skills",
   "version": "0.1.0",
-  "private": true,
   "license": "Apache-2.0",
+  "description": "Portable Agent Skills validator and bundled workflows for Daymark Agent Toolkit.",
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/albetsurya/daymark-agent-toolkit.git",
+    "directory": "packages/skills"
+  },
+  "homepage": "https://github.com/albetsurya/daymark-agent-toolkit#readme",
+  "bugs": "https://github.com/albetsurya/daymark-agent-toolkit/issues",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {

@@ -1,9 +1,25 @@
 {
   "name": "@daymark/mcp-server",
   "version": "0.1.0",
-  "private": true,
   "license": "Apache-2.0",
+  "description": "Daymark MCP server (daymark-mcp) supporting local STDIO and remote Streamable HTTP (/mcp).",
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/albetsurya/daymark-agent-toolkit.git",
+    "directory": "packages/mcp-server"
+  },
+  "homepage": "https://github.com/albetsurya/daymark-agent-toolkit#readme",
+  "bugs": "https://github.com/albetsurya/daymark-agent-toolkit/issues",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "bin": {

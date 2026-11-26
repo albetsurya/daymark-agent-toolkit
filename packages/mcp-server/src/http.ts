@@ -29,7 +29,15 @@ import {
 } from '@modelcontextprotocol/server';
 import type pino from 'pino';
 import { createDaymarkMcpServer } from './index.js';
+import {
+  createMemoryRateLimiter,
+  type RateLimitConfig,
+  type RateLimitDecision,
+  type RateLimiter,
+} from './rate-limit.js';
 import { createStderrLogger } from './tools.js';
+
+export type { RateLimitConfig, RateLimitDecision, RateLimiter };
 
 export interface BearerTokenCredential {
   token: string;
@@ -47,11 +55,6 @@ export interface RemoteOAuthConfig {
   verifier: OAuthTokenVerifier;
 }
 
-export interface RateLimitConfig {
-  windowMs: number;
-  maxRequests: number;
-}
-
 export interface DaymarkHttpMcpOptions {
   env?: Record<string, string | undefined>;
   clock?: Clock;
@@ -63,6 +66,7 @@ export interface DaymarkHttpMcpOptions {
   allowedOrigins?: string[];
   allowAnyHost?: boolean;
   rateLimit?: RateLimitConfig;
+  rateLimiter?: RateLimiter;
   maxRequestBodySize?: number;
   endpointPath?: string;
 }
@@ -138,48 +142,6 @@ function parseHostWithoutPort(hostHeader: string): string | null {
   }
   const colonIdx = trimmed.indexOf(':');
   return colonIdx === -1 ? trimmed : trimmed.slice(0, colonIdx);
-}
-
-interface RateLimitDecision {
-  allowed: boolean;
-  limit: number;
-  remaining: number;
-  resetAfterSeconds: number;
-}
-
-function createSlidingWindowRateLimiter(config: RateLimitConfig) {
-  const buckets = new Map<string, number[]>();
-
-  return function checkLimit(key: string, nowMs: number): RateLimitDecision {
-    const cutoff = nowMs - config.windowMs;
-    const timestamps = (buckets.get(key) ?? []).filter((ts) => ts > cutoff);
-    if (timestamps.length >= config.maxRequests) {
-      const oldest = timestamps[0] ?? nowMs;
-      const resetAfterSeconds = Math.max(1, Math.ceil((oldest + config.windowMs - nowMs) / 1000));
-      buckets.set(key, timestamps);
-      return {
-        allowed: false,
-        limit: config.maxRequests,
-        remaining: 0,
-        resetAfterSeconds,
-      };
-    }
-    timestamps.push(nowMs);
-    buckets.set(key, timestamps);
-    if (buckets.size > 1024) {
-      for (const [bucketKey, vals] of buckets) {
-        if (vals.every((ts) => ts <= cutoff)) {
-          buckets.delete(bucketKey);
-        }
-      }
-    }
-    return {
-      allowed: true,
-      limit: config.maxRequests,
-      remaining: Math.max(0, config.maxRequests - timestamps.length),
-      resetAfterSeconds: Math.ceil(config.windowMs / 1000),
-    };
-  };
 }
 
 function parseEnvList(raw: string | undefined): string[] {
@@ -300,7 +262,7 @@ export function createDaymarkHttpMcpHandler(
     windowMs: Number(env.DAYMARK_MCP_RATE_LIMIT_WINDOW_MS) || DEFAULT_RATE_LIMIT_WINDOW_MS,
     maxRequests: Number(env.DAYMARK_MCP_RATE_LIMIT_MAX) || DEFAULT_RATE_LIMIT_MAX_REQUESTS,
   };
-  const checkRateLimit = createSlidingWindowRateLimiter(rateLimitCfg);
+  const rateLimiter = options.rateLimiter ?? createMemoryRateLimiter(rateLimitCfg);
 
   const authMetadataOptions: AuthMetadataOptions | null = options.oauth
     ? {
@@ -458,7 +420,7 @@ export function createDaymarkHttpMcpHandler(
 
       // 6. Rate limiting keyed by principal + IP hash
       const rateKey = `${authResult.clientId}:${meta?.clientIp ?? 'unknown'}`;
-      const limit = checkRateLimit(rateKey, clock.nowMs());
+      const limit = await rateLimiter.check(rateKey, clock.nowMs());
       const rateHeaders = {
         'x-ratelimit-limit': String(limit.limit),
         'x-ratelimit-remaining': String(limit.remaining),

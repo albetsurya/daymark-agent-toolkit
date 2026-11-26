@@ -342,4 +342,257 @@ describe('@daymark/mcp-server Remote Streamable HTTP integration', () => {
       await server.close();
     }
   });
+
+  it('enforces scope and principal boundaries across mixed Bearer and OAuth identities', async () => {
+    const homeDir = makeTempHome();
+    const paths = resolveDaymarkPaths({ env: { DAYMARK_HOME: homeDir } });
+    initializeProfile({ paths, timezone: 'UTC' });
+
+    const server = await startDaymarkHttpServer({
+      host: '127.0.0.1',
+      port: 0,
+      env: { ...process.env, DAYMARK_HOME: homeDir, DAYMARK_LOG_LEVEL: 'silent' },
+      bearerTokens: [
+        {
+          token: 'bearer-rw-token-1234',
+          principalId: 'bearer-owner',
+          scopes: ['read', 'write'],
+          source: 'claude-web',
+        },
+        {
+          token: 'bearer-ro-token-1234',
+          principalId: 'bearer-reader',
+          scopes: ['read'],
+          source: 'claude-web',
+        },
+      ],
+      oauth: {
+        resourceServerUrl: 'https://daymark.example.com/mcp',
+        authorizationServers: ['https://auth.example.com'],
+        verifier: {
+          verifyAccessToken: async (token) => {
+            if (token === 'oauth-rw-token') {
+              return {
+                token,
+                clientId: 'oauth-client-rw',
+                scopes: ['daymark:read', 'daymark:write'],
+                extra: {
+                  principalId: 'oauth-user-rw',
+                  tenantId: 'default',
+                  source: 'claude-web',
+                },
+              };
+            }
+            if (token === 'oauth-ro-token') {
+              return {
+                token,
+                clientId: 'oauth-client-ro',
+                scopes: ['daymark:read'],
+                extra: {
+                  principalId: 'oauth-user-ro',
+                  tenantId: 'default',
+                  source: 'claude-web',
+                },
+              };
+            }
+            if (token === 'oauth-unknown-scope-token') {
+              return {
+                token,
+                clientId: 'oauth-client-minimal',
+                scopes: ['profile', 'email'],
+              };
+            }
+            throw new Error('token expired or invalid');
+          },
+        },
+      },
+    });
+
+    try {
+      // 1. OAuth read+write identity creates a task visible to Bearer read-only & CLI
+      const oauthRwClient = new Client({ name: 'claude-web', version: '1.0.0' });
+      await oauthRwClient.connect(
+        new StreamableHTTPClientTransport(new URL(server.mcpUrl), {
+          authProvider: { token: async () => 'oauth-rw-token' },
+        }),
+      );
+      let createdTaskId = '';
+      try {
+        const cap = CaptureTaskOutputSchema.parse(
+          (
+            await oauthRwClient.callTool({
+              name: 'daymark_capture_task',
+              arguments: { title: 'OAuth identity write check', estimateMinutes: 20 },
+            })
+          ).structuredContent,
+        );
+        createdTaskId = cap.task.id;
+        expect(cap.task.sourceAgent).toBe('claude-web');
+      } finally {
+        await oauthRwClient.close();
+      }
+
+      // 2. OAuth read-only identity reads task but gets FORBIDDEN on write tools
+      const oauthRoClient = new Client({ name: 'claude-web', version: '1.0.0' });
+      await oauthRoClient.connect(
+        new StreamableHTTPClientTransport(new URL(server.mcpUrl), {
+          authProvider: { token: async () => 'oauth-ro-token' },
+        }),
+      );
+      try {
+        const list = ListTasksOutputSchema.parse(
+          (await oauthRoClient.callTool({ name: 'daymark_list_tasks', arguments: {} }))
+            .structuredContent,
+        );
+        expect(list.tasks.some((t) => t.id === createdTaskId)).toBe(true);
+
+        const deniedWrite = await oauthRoClient.callTool({
+          name: 'daymark_start_focus',
+          arguments: { taskId: createdTaskId },
+        });
+        expect(deniedWrite.isError).toBe(true);
+        expect(JSON.parse((deniedWrite.content[0] as { text: string }).text).error.code).toBe(
+          'FORBIDDEN',
+        );
+      } finally {
+        await oauthRoClient.close();
+      }
+
+      // 3. Unknown OAuth scopes fail closed to read-only (writes rejected FORBIDDEN)
+      const minimalClient = new Client({ name: 'claude-web', version: '1.0.0' });
+      await minimalClient.connect(
+        new StreamableHTTPClientTransport(new URL(server.mcpUrl), {
+          authProvider: { token: async () => 'oauth-unknown-scope-token' },
+        }),
+      );
+      try {
+        const status = SystemStatusSchema.parse(
+          (await minimalClient.callTool({ name: 'daymark_get_status', arguments: {} }))
+            .structuredContent,
+        );
+        expect(status.initialized).toBe(true);
+        expect(status.dataDir).toBeNull();
+
+        const deniedCapture = await minimalClient.callTool({
+          name: 'daymark_capture_task',
+          arguments: { title: 'Should fail without write scope' },
+        });
+        expect(deniedCapture.isError).toBe(true);
+        expect(JSON.parse((deniedCapture.content[0] as { text: string }).text).error.code).toBe(
+          'FORBIDDEN',
+        );
+      } finally {
+        await minimalClient.close();
+      }
+
+      // 4. Bearer read-only sees OAuth-created task, cannot mutate; Bearer RW still works
+      const bearerRoClient = new Client({ name: 'claude-web', version: '1.0.0' });
+      await bearerRoClient.connect(
+        new StreamableHTTPClientTransport(new URL(server.mcpUrl), {
+          authProvider: { token: async () => 'bearer-ro-token-1234' },
+        }),
+      );
+      try {
+        const list = ListTasksOutputSchema.parse(
+          (await bearerRoClient.callTool({ name: 'daymark_list_tasks', arguments: {} }))
+            .structuredContent,
+        );
+        expect(list.tasks.some((t) => t.id === createdTaskId)).toBe(true);
+
+        const deniedComplete = await bearerRoClient.callTool({
+          name: 'daymark_complete_task',
+          arguments: { taskId: createdTaskId },
+        });
+        expect(deniedComplete.isError).toBe(true);
+        expect(JSON.parse((deniedComplete.content[0] as { text: string }).text).error.code).toBe(
+          'FORBIDDEN',
+        );
+      } finally {
+        await bearerRoClient.close();
+      }
+
+      // 5. Invalid/expired OAuth token gets 401 WWW-Authenticate invalid_token
+      const expiredRes = await fetch(server.mcpUrl, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: 'Bearer oauth-expired-token',
+        },
+        body: '{}',
+      });
+      expect(expiredRes.status).toBe(401);
+      expect(expiredRes.headers.get('www-authenticate')).toContain('error="invalid_token"');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('supports pluggable async distributed RateLimiter shared across multiple server instances', async () => {
+    const homeDir = makeTempHome();
+    const paths = resolveDaymarkPaths({ env: { DAYMARK_HOME: homeDir } });
+    initializeProfile({ paths, timezone: 'UTC' });
+
+    // Simulated distributed store (e.g. Redis / Cloudflare KV / Durable Object)
+    const sharedCounts = new Map<string, number>();
+    const sharedRateLimiter = {
+      async check(key: string) {
+        await Promise.resolve();
+        const nextCount = (sharedCounts.get(key) ?? 0) + 1;
+        sharedCounts.set(key, nextCount);
+        const max = 2;
+        if (nextCount > max) {
+          return { allowed: false, limit: max, remaining: 0, resetAfterSeconds: 30 };
+        }
+        return {
+          allowed: true,
+          limit: max,
+          remaining: max - nextCount,
+          resetAfterSeconds: 60,
+        };
+      },
+    };
+
+    const sharedCreds = [
+      {
+        token: 'shared-dist-token-1234',
+        principalId: 'dist-principal',
+        scopes: ['read', 'write'] as const,
+      },
+    ];
+
+    const serverA = await startDaymarkHttpServer({
+      host: '127.0.0.1',
+      port: 0,
+      env: { ...process.env, DAYMARK_HOME: homeDir, DAYMARK_LOG_LEVEL: 'silent' },
+      bearerTokens: sharedCreds,
+      rateLimiter: sharedRateLimiter,
+    });
+    const serverB = await startDaymarkHttpServer({
+      host: '127.0.0.1',
+      port: 0,
+      env: { ...process.env, DAYMARK_HOME: homeDir, DAYMARK_LOG_LEVEL: 'silent' },
+      bearerTokens: sharedCreds,
+      rateLimiter: sharedRateLimiter,
+    });
+
+    try {
+      const headers = {
+        'content-type': 'application/json',
+        authorization: 'Bearer shared-dist-token-1234',
+      };
+      const r1 = await fetch(serverA.mcpUrl, { method: 'POST', headers, body: '{}' });
+      expect(r1.status).not.toBe(429);
+      expect(r1.headers.get('x-ratelimit-remaining')).toBe('1');
+
+      const r2 = await fetch(serverB.mcpUrl, { method: 'POST', headers, body: '{}' });
+      expect(r2.status).not.toBe(429);
+      expect(r2.headers.get('x-ratelimit-remaining')).toBe('0');
+
+      const r3 = await fetch(serverA.mcpUrl, { method: 'POST', headers, body: '{}' });
+      expect(r3.status).toBe(429);
+      expect(r3.headers.get('retry-after')).toBe('30');
+    } finally {
+      await Promise.all([serverA.close(), serverB.close()]);
+    }
+  });
 });

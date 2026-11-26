@@ -18,7 +18,7 @@ import {
   type WeekStartsOn,
 } from '@daymark/contracts';
 import { createDaymarkService, formatUtcMsInTimezoneDate } from '@daymark/core';
-import { initializeProfile, openDaymarkStore } from '@daymark/storage-sqlite';
+import { checkSqliteIntegrity, initializeProfile, openDaymarkStore } from '@daymark/storage-sqlite';
 import { Command } from 'commander';
 import pino from 'pino';
 import {
@@ -692,9 +692,24 @@ export function createDaymarkCli(runtime: CliRuntimeOptions = {}): Command {
       const paths = resolveDaymarkPaths({ env });
       const config = readProfileConfig(paths.configPath);
       const dbExists = existsSync(paths.databasePath);
-      const status = withService('doctor', (svc) => svc.getStatus({}));
+      const integrity = dbExists
+        ? checkSqliteIntegrity(paths.databasePath)
+        : { exists: false, ok: false, messages: ['Database file does not exist.'] };
+      const status =
+        dbExists && !integrity.ok
+          ? {
+              initialized: false,
+              schemaVersion: null,
+              timezone: config?.timezone ?? null,
+            }
+          : withService('doctor', (svc) => svc.getStatus({}));
       const hereDir = dirname(fileURLToPath(import.meta.url));
       const mcpBinCandidate = resolve(hereDir, '../../mcp-server/dist/bin.mjs');
+      const databaseIntegrity: 'ok' | 'corrupt' | 'missing' = !dbExists
+        ? 'missing'
+        : integrity.ok
+          ? 'ok'
+          : 'corrupt';
       const report = {
         nodeVersion: process.version,
         appVersion: APP_VERSION,
@@ -703,6 +718,8 @@ export function createDaymarkCli(runtime: CliRuntimeOptions = {}): Command {
         timezone: status.timezone,
         configExists: config !== null,
         databaseExists: dbExists,
+        databaseIntegrity,
+        integrityMessages: integrity.messages,
         dataDir: paths.dataDir,
         mcpServerBinaryFound: existsSync(mcpBinCandidate),
         mcpServerBinaryPath: existsSync(mcpBinCandidate) ? mcpBinCandidate : null,
@@ -710,12 +727,18 @@ export function createDaymarkCli(runtime: CliRuntimeOptions = {}): Command {
       emitSuccess(report, (r) =>
         [
           `Daymark Doctor (v${r.appVersion}, Node ${r.nodeVersion})`,
-          `Initialized:       ${r.initialized ? 'yes' : 'no (run: daymark init)'}`,
-          `Config file:       ${r.configExists ? 'present' : 'missing'}`,
-          `Database file:     ${r.databaseExists ? 'present' : 'missing'}`,
-          `Schema version:    ${r.schemaVersion ?? 'none'}`,
-          `Timezone:          ${r.timezone ?? 'unconfigured'}`,
-          `MCP server bundle: ${r.mcpServerBinaryFound ? r.mcpServerBinaryPath : 'not found in monorepo sibling'}`,
+          `Initialized:        ${r.initialized ? 'yes' : 'no (run: daymark init)'}`,
+          `Config file:        ${r.configExists ? 'present' : 'missing'}`,
+          `Database file:      ${r.databaseExists ? 'present' : 'missing'}`,
+          `Database integrity: ${r.databaseIntegrity}${r.databaseIntegrity === 'corrupt' ? ` (${r.integrityMessages.join('; ')})` : ''}`,
+          `Schema version:     ${r.schemaVersion ?? 'none'}`,
+          `Timezone:           ${r.timezone ?? 'unconfigured'}`,
+          `MCP server bundle:  ${r.mcpServerBinaryFound ? r.mcpServerBinaryPath : 'not found in monorepo sibling'}`,
+          ...(r.databaseIntegrity === 'corrupt'
+            ? [
+                'Recovery step:      Move damaged DB (-wal/-shm) aside, run `daymark init`, and run `daymark import <backup.json> --mode replace --confirm`.',
+              ]
+            : []),
         ].join('\n'),
       );
     });

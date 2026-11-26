@@ -36,18 +36,35 @@ export interface SqliteConnection {
 }
 
 export function openSqliteConnection(filename: string): SqliteConnection {
-  const raw = new Database(filename);
-  raw.pragma('journal_mode = WAL');
-  raw.pragma('foreign_keys = ON');
-  raw.pragma('busy_timeout = 5000');
-  const db = drizzle(raw, { schema: daymarkSchema });
-  return {
-    raw,
-    db,
-    close: () => {
-      raw.close();
-    },
-  };
+  let raw: Database.Database | null = null;
+  try {
+    raw = new Database(filename);
+    raw.pragma('journal_mode = WAL');
+    raw.pragma('foreign_keys = ON');
+    raw.pragma('busy_timeout = 5000');
+    const db = drizzle(raw, { schema: daymarkSchema });
+    const closedRef = { closed: false };
+    const openedRaw = raw;
+    return {
+      raw: openedRaw,
+      db,
+      close: () => {
+        if (!closedRef.closed) {
+          closedRef.closed = true;
+          openedRaw.close();
+        }
+      },
+    };
+  } catch (err) {
+    if (raw) {
+      try {
+        raw.close();
+      } catch {
+        // ignore secondary close failure when mapping primary SQLite error
+      }
+    }
+    mapSqliteError(err);
+  }
 }
 
 function mapSqliteError(err: unknown): never {
@@ -59,6 +76,17 @@ function mapSqliteError(err: unknown): never {
         'DATABASE_BUSY',
         'Daymark SQLite database is temporarily locked by another process.',
         { nextStep: 'Retry the operation shortly.', cause: err },
+      );
+    }
+    if (code === 'SQLITE_CORRUPT' || code === 'SQLITE_NOTADB' || code === 'SQLITE_CORRUPT_VTAB') {
+      throw new DaymarkError(
+        'DATABASE_CORRUPT',
+        'Daymark SQLite database is corrupted or not a valid SQLite database file.',
+        {
+          nextStep:
+            'Move the damaged database file (and any -wal/-shm files) aside, run `daymark init`, and restore from backup with `daymark import <file> --mode replace --confirm`.',
+          cause: err,
+        },
       );
     }
     if (
@@ -74,6 +102,64 @@ function mapSqliteError(err: unknown): never {
     }
   }
   throw err;
+}
+
+export interface SqliteIntegrityReport {
+  exists: boolean;
+  ok: boolean;
+  messages: string[];
+  errorCode?: string;
+}
+
+/**
+ * Runs SQLite `PRAGMA integrity_check` safely without throwing on damaged files.
+ */
+export function checkSqliteIntegrity(filename: string): SqliteIntegrityReport {
+  if (!existsSync(filename)) {
+    return {
+      exists: false,
+      ok: false,
+      messages: ['Database file does not exist.'],
+    };
+  }
+  let conn: SqliteConnection | null = null;
+  try {
+    conn = openSqliteConnection(filename);
+    const rows = conn.raw.pragma('integrity_check') as Array<{ integrity_check?: string }>;
+    const messages = rows
+      .map((r) => r.integrity_check)
+      .filter((msg): msg is string => typeof msg === 'string' && msg.length > 0);
+    const ok = messages.length === 1 && messages[0] === 'ok';
+    return {
+      exists: true,
+      ok,
+      messages: messages.length > 0 ? messages : ['Unknown integrity check result.'],
+      errorCode: ok ? undefined : 'DATABASE_CORRUPT',
+    };
+  } catch (err) {
+    if (err instanceof DaymarkError) {
+      return {
+        exists: true,
+        ok: false,
+        messages: [err.message],
+        errorCode: err.code,
+      };
+    }
+    return {
+      exists: true,
+      ok: false,
+      messages: [err instanceof Error ? err.message : 'Failed integrity check.'],
+      errorCode: 'DATABASE_CORRUPT',
+    };
+  } finally {
+    if (conn) {
+      try {
+        conn.close();
+      } catch {
+        // ignore close error on damaged connection
+      }
+    }
+  }
 }
 
 export interface InitializeProfileOptions {
@@ -191,12 +277,16 @@ export function openDaymarkStore(paths: DaymarkPaths = resolveDaymarkPaths()): M
     isInitialized() {
       const c = ensureConnection();
       if (!c) return false;
-      const hasSettingsTable = c.raw
-        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'settings'")
-        .get();
-      if (!hasSettingsTable) return false;
-      const repos = createSqliteRepositories(c.db, c.raw);
-      return repos.settings.getSettings() !== null;
+      try {
+        const hasSettingsTable = c.raw
+          .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'settings'")
+          .get();
+        if (!hasSettingsTable) return false;
+        const repos = createSqliteRepositories(c.db, c.raw);
+        return repos.settings.getSettings() !== null;
+      } catch (err) {
+        mapSqliteError(err);
+      }
     },
     getDataDir() {
       return paths.dataDir;
@@ -204,7 +294,11 @@ export function openDaymarkStore(paths: DaymarkPaths = resolveDaymarkPaths()): M
     getSchemaVersion() {
       const c = ensureConnection();
       if (!c) return null;
-      return getLatestAppliedMigration(c.raw);
+      try {
+        return getLatestAppliedMigration(c.raw);
+      } catch (err) {
+        mapSqliteError(err);
+      }
     },
     getCapabilities() {
       return {

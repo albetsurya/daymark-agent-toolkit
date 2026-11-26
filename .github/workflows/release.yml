@@ -33,10 +33,11 @@ jobs:
           pnpm test
           pnpm test:integration
 
-      - name: Pack & verify platform bundles
+      - name: Pack & verify platform and npm release bundles
         run: |
           pnpm pack:platforms
           pnpm verify:packages
+          pnpm verify:release
 
       - name: Archive platform bundles and generate SHA-256 checksums
         run: |

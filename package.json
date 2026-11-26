@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "Daymark Agent Toolkit - local-first, cross-agent productivity toolkit (working title)",
+  "description": "Daymark Agent Toolkit - local-first productivity toolkit across CLI, MCP STDIO, Web Dashboard, and Remote HTTP MCP",
   "type": "module",
   "packageManager": "pnpm@12.16.1",
   "engines": {
@@ -21,6 +21,9 @@
     "build": "pnpm -r --workspace-concurrency=1 --if-present build",
     "pack:platforms": "pnpm --filter @daymark/platform-adapters pack:platforms",
     "verify:packages": "pnpm --filter @daymark/platform-adapters verify:packages",
+    "pack:npm": "node scripts/verify-release-readiness.mjs --pack",
+    "verify:release": "node scripts/verify-release-readiness.mjs",
+    "verify:matrix": "node scripts/verify-host-platforms.mjs",
     "clean": "pnpm -r --if-present clean"
   },
   "devDependencies": {
