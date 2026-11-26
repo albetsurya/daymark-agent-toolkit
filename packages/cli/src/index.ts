@@ -18,7 +18,12 @@ import {
   type WeekStartsOn,
 } from '@daymark/contracts';
 import { createDaymarkService, formatUtcMsInTimezoneDate } from '@daymark/core';
-import { checkSqliteIntegrity, initializeProfile, openDaymarkStore } from '@daymark/storage-sqlite';
+import {
+  checkSqliteDriver,
+  checkSqliteIntegrity,
+  initializeProfile,
+  openDaymarkStore,
+} from '@daymark/storage-sqlite';
 import { Command } from 'commander';
 import pino from 'pino';
 import {
@@ -689,20 +694,28 @@ export function createDaymarkCli(runtime: CliRuntimeOptions = {}): Command {
     .command('doctor')
     .description('Check local Daymark environment, database, config, and MCP server readiness')
     .action(() => {
+      const driver = checkSqliteDriver();
       const paths = resolveDaymarkPaths({ env });
       const config = readProfileConfig(paths.configPath);
       const dbExists = existsSync(paths.databasePath);
-      const integrity = dbExists
-        ? checkSqliteIntegrity(paths.databasePath)
-        : { exists: false, ok: false, messages: ['Database file does not exist.'] };
+      const integrity =
+        dbExists && driver.ready
+          ? checkSqliteIntegrity(paths.databasePath)
+          : dbExists && !driver.ready
+            ? {
+                exists: true,
+                ok: false,
+                messages: [`SQLite driver unavailable: ${driver.error ?? 'native bindings error'}`],
+              }
+            : { exists: false, ok: false, messages: ['Database file does not exist.'] };
       const status =
-        dbExists && !integrity.ok
-          ? {
+        dbExists && integrity.ok && driver.ready
+          ? withService('doctor', (svc) => svc.getStatus({}))
+          : {
               initialized: false,
               schemaVersion: null,
               timezone: config?.timezone ?? null,
-            }
-          : withService('doctor', (svc) => svc.getStatus({}));
+            };
       const hereDir = dirname(fileURLToPath(import.meta.url));
       const mcpBinCandidate = resolve(hereDir, '../../mcp-server/dist/bin.mjs');
       const databaseIntegrity: 'ok' | 'corrupt' | 'missing' = !dbExists
@@ -713,6 +726,8 @@ export function createDaymarkCli(runtime: CliRuntimeOptions = {}): Command {
       const report = {
         nodeVersion: process.version,
         appVersion: APP_VERSION,
+        sqliteDriverReady: driver.ready,
+        sqliteDriverDetails: driver,
         initialized: status.initialized,
         schemaVersion: status.schemaVersion,
         timezone: status.timezone,
@@ -727,6 +742,7 @@ export function createDaymarkCli(runtime: CliRuntimeOptions = {}): Command {
       emitSuccess(report, (r) =>
         [
           `Daymark Doctor (v${r.appVersion}, Node ${r.nodeVersion})`,
+          `SQLite driver:      ${r.sqliteDriverReady ? 'ready (better-sqlite3 native bindings loaded)' : `FAILED (${r.sqliteDriverDetails?.error ?? 'native bindings error'})`}`,
           `Initialized:        ${r.initialized ? 'yes' : 'no (run: daymark init)'}`,
           `Config file:        ${r.configExists ? 'present' : 'missing'}`,
           `Database file:      ${r.databaseExists ? 'present' : 'missing'}`,
@@ -734,7 +750,10 @@ export function createDaymarkCli(runtime: CliRuntimeOptions = {}): Command {
           `Schema version:     ${r.schemaVersion ?? 'none'}`,
           `Timezone:           ${r.timezone ?? 'unconfigured'}`,
           `MCP server bundle:  ${r.mcpServerBinaryFound ? r.mcpServerBinaryPath : 'not found in monorepo sibling'}`,
-          ...(r.databaseIntegrity === 'corrupt'
+          ...(!r.sqliteDriverReady && r.sqliteDriverDetails?.troubleshooting
+            ? r.sqliteDriverDetails.troubleshooting.map((step) => `Driver fix:         ${step}`)
+            : []),
+          ...(r.databaseIntegrity === 'corrupt' && r.sqliteDriverReady
             ? [
                 'Recovery step:      Move damaged DB (-wal/-shm) aside, run `daymark init`, and run `daymark import <backup.json> --mode replace --confirm`.',
               ]

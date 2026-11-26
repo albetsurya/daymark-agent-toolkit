@@ -80,3 +80,32 @@ Daymark **never** silently deletes or recreates a corrupted `.sqlite` file behin
 - All multi-step writes (`captureTask`, `completeTask`, `startFocus`, `importBackup`) run inside atomic SQLite transactions: if a writer process receives `SIGTERM` or `SIGKILL` mid-transaction before commit, SQLite WAL crash recovery rolls back partial changes automatically on the next open.
 - Both `daymark-mcp --http` and `daymark-web` install `SIGINT` and `SIGTERM` shutdown hooks to drain requests and call `store.close()`.
 - If `DATABASE_BUSY` occurs transiently while multiple interfaces (`daymark`, STDIO MCP, `daymark-web`) write concurrently, retry once any runaway background process is checked (`lsof`/`ps`).
+
+---
+
+## 5. Troubleshooting Native SQLite Driver (`better-sqlite3`)
+
+Daymark relies on `better-sqlite3` native C++ bindings for deterministic, synchronous WAL persistence. When running on new Node.js releases (such as Node 24), Windows developer machines, or minimal container environments without prebuilt binary packages:
+
+### Diagnostic Check
+Run `daymark doctor` to inspect the native binding status:
+```bash
+node packages/cli/dist/bin.mjs doctor
+```
+If the native binding fails to load (e.g. `NODE_MODULE_VERSION` mismatch or missing bindings), `doctor` surfaces `sqliteDriverReady: false` alongside tailored fix steps without throwing an unhandled exception.
+
+### Platform-Specific Remedies
+- **Windows:**
+  - Install Visual Studio Community or Build Tools with the **Desktop development with C++** workload.
+  - Alternatively, in an administrative PowerShell: `npm install --global windows-build-tools`.
+  - Ensure Python >= 3.10 is installed and visible in `PATH`.
+  - Run `pnpm rebuild better-sqlite3`.
+- **Linux (Debian/Ubuntu):**
+  - Install the C++ toolchain: `sudo apt-get install -y build-essential python3`.
+  - Run `pnpm rebuild better-sqlite3`.
+- **macOS:**
+  - Install Apple Developer Command Line Tools: `xcode-select --install`.
+  - Run `pnpm rebuild better-sqlite3`.
+
+### Decoupled Storage Fallback
+Daymark's core business logic (`@daymark/core`) does not depend directly on `better-sqlite3`. It depends on the `DaymarkStore` and `AsyncDaymarkStore` abstractions (`@daymark/contracts`). In environments where native C++ compilation is constrained (e.g. serverless edge runtimes or sandboxed web workers), a pure-JS / WASM adapter (e.g. `sql.js` or cloud storage like Turso / Cloudflare D1) can satisfy the storage interface without changing domain services. See [`docs/CLOUD_ARCHITECTURE.md`](./CLOUD_ARCHITECTURE.md).

@@ -111,6 +111,73 @@ export interface SqliteIntegrityReport {
   errorCode?: string;
 }
 
+export interface SqliteDriverReport {
+  ready: boolean;
+  driver: 'better-sqlite3';
+  nodeVersion: string;
+  error?: string;
+  troubleshooting?: string[];
+}
+
+/**
+ * Validates whether the native `better-sqlite3` driver bindings load and execute queries cleanly.
+ * Catches C++ binary loading issues, ABI version mismatches, and returns platform-specific remedies.
+ */
+export function checkSqliteDriver(): SqliteDriverReport {
+  let mem: Database.Database | null = null;
+  try {
+    mem = new Database(':memory:');
+    mem.pragma('journal_mode = WAL');
+    const row = mem.prepare('SELECT 1 as alive').get() as { alive?: number };
+    const ready = row?.alive === 1;
+    mem.close();
+    mem = null;
+    return {
+      ready,
+      driver: 'better-sqlite3',
+      nodeVersion: process.version,
+    };
+  } catch (err) {
+    if (mem) {
+      try {
+        mem.close();
+      } catch {
+        // ignore secondary close
+      }
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    const isWindows = process.platform === 'win32';
+    const isMac = process.platform === 'darwin';
+    const troubleshooting: string[] = [
+      'Rebuild native addon for your current Node version: `pnpm rebuild better-sqlite3` (or `npm rebuild better-sqlite3`)',
+    ];
+    if (isWindows) {
+      troubleshooting.push(
+        'Windows: Install Visual Studio Build Tools with Desktop development with C++ or run `npm install --global windows-build-tools`',
+        'Windows: Ensure Python >= 3.10 is installed and available in your PATH for node-gyp',
+      );
+    } else if (isMac) {
+      troubleshooting.push(
+        'macOS: Install command line developer tools with `xcode-select --install`',
+      );
+    } else {
+      troubleshooting.push(
+        'Linux: Install C++ compiler and Python headers, e.g. `sudo apt-get install -y build-essential python3`',
+      );
+    }
+    troubleshooting.push(
+      'Node 24 Notice: If prebuilt binaries for your Node ABI are not published yet, building from source requires C++ toolchain and python3.',
+    );
+    return {
+      ready: false,
+      driver: 'better-sqlite3',
+      nodeVersion: process.version,
+      error: message,
+      troubleshooting,
+    };
+  }
+}
+
 /**
  * Runs SQLite `PRAGMA integrity_check` safely without throwing on damaged files.
  */

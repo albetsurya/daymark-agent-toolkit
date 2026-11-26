@@ -113,6 +113,37 @@ Core use cases must be reachable from both CLI and MCP. The CLI may have richer 
 ### FR-11 Export/import
 Export produces a versioned JSON archive. Import validates schema and IDs, supports dry-run, and refuses destructive overwrite unless explicitly confirmed.
 
+### FR-12 CLI Command Reference
+
+The `daymark` CLI provides operational access to the shared core:
+
+| Command | Arguments / Flags | Description |
+|---|---|---|
+| `daymark init` | `[--timezone <tz>] [--start-hour <h>]` | Initializes local data directory, SQLite DB, and configuration |
+| `daymark status` | `[--json]` | Checks initialization status, active focus, and DB stats |
+| `daymark doctor` | `[--json]` | Validates environment, C++ driver readiness, SQLite integrity, and MCP bundle |
+| `daymark project add` | `<name> [--description <desc>]` | Creates a new project |
+| `daymark project list` | `[--status <status>]` | Lists projects (`active`, `archived`, `all`) |
+| `daymark project update` | `<projectId> [--name <name>] [--description <desc>]` | Updates project name or description |
+| `daymark project archive` | `<projectId>` | Archives an active project |
+| `daymark task add` | `<title> [--project <id>] [--priority <p>] [--estimate <m>] [--due <d>]` | Captures a task with explicit null preservation |
+| `daymark task list` | `[--status <s>] [--priority <p>] [--project <id>] [--search <q>]` | Lists tasks with filtering and pagination |
+| `daymark task show` | `<taskId>` | Displays full details and project association for a task |
+| `daymark task update` | `<taskId> [--title <t>] [--priority <p>] [--estimate <m>] [--due <d>]` | Updates explicit task fields |
+| `daymark task done` | `<taskId> [--note <n>]` | Marks a task completed, optionally recording worklog in same transaction |
+| `daymark task cancel` | `<taskId> [--reason <r>]` | Cancels an active task |
+| `daymark task archive` | `<taskId>` | Archives a task |
+| `daymark plan today` | `[--available-minutes <m>] [--timezone <tz>]` | Computes deterministic daily plan for minute budget |
+| `daymark focus start` | `[--task <id>] [--note <n>]` | Starts an active focus session (enforces max 1 active) |
+| `daymark focus stop` | `[--worklog] [--note <n>]` | Stops active focus session and optionally creates worklog |
+| `daymark focus list` | `[--limit <n>]` | Lists recent and active focus sessions |
+| `daymark worklog add` | `<summary> [--duration <m>] [--task <id>]` | Records an explicit worklog entry |
+| `daymark worklog list` | `[--from <d>] [--to <d>] [--project <id>]` | Lists worklogs in a date/time range |
+| `daymark review day` | `[--date <d>] [--timezone <tz>]` | Generates structured daily summary and data gaps |
+| `daymark review week` | `[--date <d>] [--timezone <tz>]` | Generates structured weekly review with DST-aware daily totals |
+| `daymark export` | `<file>` | Exports complete profile to a verified JSON backup |
+| `daymark import` | `<file> [--mode merge\|replace] [--confirm]` | Restores data from JSON backup archive |
+
 ## 8. Prioritization and planning behavior
 
 The MVP planner must be deterministic and explainable. Initial ordering:

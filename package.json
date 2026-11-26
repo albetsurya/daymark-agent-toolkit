@@ -8,7 +8,7 @@
   "packageManager": "pnpm@12.16.1",
   "engines": {
     "node": ">=22.12.0",
-    "pnpm": ">=10.0.0"
+    "pnpm": ">=12.0.0"
   },
   "scripts": {
     "lint": "biome check packages apps",
@@ -24,6 +24,7 @@
     "pack:npm": "node scripts/verify-release-readiness.mjs --pack",
     "verify:release": "node scripts/verify-release-readiness.mjs",
     "verify:matrix": "node scripts/verify-host-platforms.mjs",
+    "verify:docs": "node scripts/verify-docs-sync.mjs",
     "clean": "pnpm -r --if-present clean"
   },
   "devDependencies": {

@@ -110,7 +110,34 @@ Domain rules reside in `@daymark/core`, persistence resides in `@daymark/storage
 ### Prerequisites
 
 - Node.js `>= 22.12.0` (tested on Node `v24.21.0`)
-- pnpm `12.16.1`
+- pnpm `>= 12.0.0` (pinned to `12.16.1` via `packageManager`)
+
+To avoid version mismatches across developer machines or CI environments, activate Corepack:
+
+```bash
+corepack enable
+corepack prepare pnpm@12.16.1 --activate
+```
+
+### Native SQLite Module (`better-sqlite3`) & Troubleshooting
+
+Daymark uses `better-sqlite3` for high-throughput, synchronous SQLite operations with strict WAL concurrency. Prebuilt binaries download automatically during installation for common operating systems and Node versions.
+
+If your environment builds the native addon from source (e.g. fresh Node 24 ABI versions, Alpine Linux/musl, or specialized Windows setups):
+- **Windows:** Install Visual Studio Build Tools with the *"Desktop development with C++"* workload, and ensure Python >= 3.10 is in your `PATH` (or run `npm install --global windows-build-tools` in an elevated shell).
+- **Linux (Ubuntu/Debian):** `sudo apt-get install -y build-essential python3`
+- **macOS:** `xcode-select --install`
+
+#### Verifying Driver Readiness
+```bash
+# Check native driver loading, ABI compatibility, and database integrity
+daymark doctor
+
+# Recompile the native addon against your active Node runtime if needed
+pnpm rebuild better-sqlite3
+```
+
+> **Decoupled Storage Fallback:** All Daymark business logic accesses storage through the abstract `DaymarkStore` and `AsyncDaymarkStore` contracts (`@daymark/contracts`, `@daymark/core`). If native C++ compilation is prohibited (such as edge workers or browser WASM runtimes), alternative storage adapters can be dropped in without changing domain logic (see [`docs/CLOUD_ARCHITECTURE.md`](./docs/CLOUD_ARCHITECTURE.md)).
 
 ### 1. Install, Build, and Test
 

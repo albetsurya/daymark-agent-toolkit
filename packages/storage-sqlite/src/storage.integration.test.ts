@@ -9,6 +9,7 @@ import { FIXED_IDS } from '@daymark/test-fixtures';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  checkSqliteDriver,
   checkSqliteIntegrity,
   initializeProfile,
   openDaymarkStore,
@@ -31,6 +32,13 @@ afterEach(() => {
 });
 
 describe('@daymark/storage-sqlite integration', () => {
+  it('validates native better-sqlite3 driver readiness and provides environment diagnostics', () => {
+    const report = checkSqliteDriver();
+    expect(report.driver).toBe('better-sqlite3');
+    expect(report.nodeVersion).toBe(process.version);
+    expect(report.ready).toBe(true);
+    expect(report.error).toBeUndefined();
+  });
   it('initializes a fresh profile safely, is idempotent, and does not touch uninitialized DB on status', () => {
     const paths = makeTempPaths();
     const storeBefore = openDaymarkStore(paths);

@@ -38,6 +38,7 @@ jobs:
           pnpm pack:platforms
           pnpm verify:packages
           pnpm verify:release
+          pnpm verify:docs
 
       - name: Archive platform bundles and generate SHA-256 checksums
         run: |

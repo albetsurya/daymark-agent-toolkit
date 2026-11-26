@@ -38,6 +38,21 @@ packages/
   test-fixtures/      # Shared deterministic fixtures
 ```
 
+### Package Topology
+
+| Package Name | Workspace Directory | Role |
+|---|---|---|
+| `@daymark/contracts` | `packages/contracts` | Zod schemas, shared DTOs, typed `DaymarkError` codes, backup archive schema |
+| `@daymark/config` | `packages/config` | Runtime configuration and OS-conventional local paths (`0700`/`0600` permissions) |
+| `@daymark/core` | `packages/core` | Separated domain, storage ports (`DaymarkStore` / `AsyncDaymarkStore`), application use cases, and permission policies |
+| `@daymark/storage-sqlite` | `packages/storage-sqlite` | Drizzle schema, migrations, `better-sqlite3` driver verification, and WAL transactions |
+| `@daymark/cli` | `packages/cli` | Commander CLI adapter (`daymark`) |
+| `@daymark/mcp-server` | `packages/mcp-server` | MCP STDIO and Streamable HTTP (`/mcp`) server adapters |
+| `@daymark/skills` | `packages/skills` | Portable SKILL.md workflows and validator |
+| `@daymark/platform-adapters` | `packages/platform-adapters` | Packaging/install/validation adapters per AI platform |
+| `@daymark/test-fixtures` | `packages/test-fixtures` | Shared deterministic fixtures (internal test fixture package) |
+| `@daymark/web` | `apps/web` | Standalone React + TypeScript dashboard + local Node HTTP server (`127.0.0.1`) |
+
 ### Dependency direction
 
 - `contracts` has no dependency on any other workspace package.

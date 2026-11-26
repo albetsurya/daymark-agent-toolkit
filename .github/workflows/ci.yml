@@ -58,3 +58,4 @@ jobs:
           pnpm verify:packages
           pnpm verify:release
           pnpm verify:matrix
+          pnpm verify:docs

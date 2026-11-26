@@ -96,7 +96,31 @@ Where supported, return both human-readable text and machine-readable `structure
 
 ## 6. Error semantics
 
-Return machine-readable error code, concise message, and safe next step. Do not include stack traces, DB paths, or private data. Mark MCP tool failures with the protocol's error mechanism.
+Return machine-readable error code, concise message, and safe next step. Do not include stack traces, DB paths, or private data. Mark MCP tool failures with the protocol's error mechanism (`isError: true` with structured `{ ok: false, error: { code, message, nextStep } }` payload).
+
+### Canonical Error Codes (`DaymarkErrorCode`)
+
+| Error Code | HTTP / Adapter Status | Meaning | Typical Next Step |
+|---|---|---|---|
+| `PROFILE_NOT_INITIALIZED` | 400 | Profile configuration or database has not been initialized | Run `daymark init` to set up timezone and initial store |
+| `TASK_NOT_FOUND` | 404 | The requested task UUID does not exist | Verify task ID with `daymark_list_tasks` |
+| `PROJECT_NOT_FOUND` | 404 | The requested project UUID does not exist | Verify project ID with `daymark_list_projects` |
+| `FOCUS_SESSION_NOT_FOUND` | 404 | The requested focus session UUID does not exist | Verify session ID or check active session with `daymark_get_status` |
+| `INVALID_STATUS_TRANSITION` | 400 | Attempted an illegal lifecycle transition (e.g. from completed to active without reactivating) | Verify valid task transitions in domain model |
+| `INVALID_TIME_RANGE` | 400 | Start time is after end time or interval is invalid | Ensure start time precedes end time |
+| `INVALID_TIMEZONE` | 400 | Timezone string is not a valid IANA timezone | Provide a valid IANA timezone (e.g., `Asia/Jakarta`, `UTC`) |
+| `FOCUS_SESSION_ALREADY_ACTIVE` | 409 | A focus session is already active; only 1 active session allowed | Finish or interrupt existing session with `daymark_finish_focus` |
+| `FOCUS_SESSION_NOT_ACTIVE` | 409 | Attempted to stop or interrupt when no focus session is currently running | Start a focus session with `daymark_start_focus` |
+| `VALIDATION_FAILED` | 400 | Payload failed schema validation (missing required fields or invalid types) | Correct payload fields according to tool schema |
+| `DATABASE_BUSY` | 503 | SQLite database or WAL lock timeout | Retry operation after brief backoff |
+| `DATABASE_CORRUPT` | 503 | Database failed PRAGMA integrity check or header invalid | Refer to `docs/DISASTER_RECOVERY.md` to restore from backup |
+| `IMPORT_CONFLICT` | 409 | Imported records conflict with existing records without overwrite flag | Re-run import with explicit resolution mode or `--confirm` |
+| `BACKUP_VERSION_UNSUPPORTED` | 400 | Backup payload version is incompatible with current schema | Upgrade Daymark or migrate backup schema |
+| `CONFIRMATION_REQUIRED` | 400 | Destructive action requires explicit `--confirm` flag or user consent | Re-run action with explicit confirmation |
+| `UNAUTHORIZED` | 401 | Missing or invalid authentication token | Provide valid Bearer token or OAuth credentials |
+| `FORBIDDEN` | 403 | Scope or permission check denied action (e.g. write on read-only session) | Use token with appropriate scope |
+| `RATE_LIMITED` | 429 | Sliding-window request rate limit exceeded | Retry after rate limit window resets |
+| `INTERNAL_ERROR` | 500 | Unhandled system exception or runtime failure | Check logs with `DAYMARK_LOG_LEVEL=debug` or run `daymark doctor` |
 
 ## 7. Tool descriptions for agents
 

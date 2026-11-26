@@ -55,7 +55,9 @@ describe('@daymark/cli end-to-end workflow', () => {
 
     const doctor = await execCli(['doctor', '--json'], home1);
     expect(doctor.code).toBe(0);
-    expect(JSON.parse(doctor.stdout).data.initialized).toBe(true);
+    const doctorData = JSON.parse(doctor.stdout).data;
+    expect(doctorData.initialized).toBe(true);
+    expect(doctorData.sqliteDriverReady).toBe(true);
 
     // 2. Add project & tasks
     const proj = await execCli(['project', 'add', 'Daymark MVP', '--json'], home1);
@@ -186,7 +188,12 @@ describe('@daymark/cli end-to-end workflow', () => {
     // 8. Doctor reports databaseIntegrity ok cleanly, and detects corrupt files safely
     const healthyDoctor = await execCli(['doctor', '--json'], home2);
     expect(healthyDoctor.code).toBe(0);
-    expect(JSON.parse(healthyDoctor.stdout).data.databaseIntegrity).toBe('ok');
+    const healthyData = JSON.parse(healthyDoctor.stdout).data as {
+      databaseIntegrity: string;
+      sqliteDriverReady: boolean;
+    };
+    expect(healthyData.databaseIntegrity).toBe('ok');
+    expect(healthyData.sqliteDriverReady).toBe(true);
 
     const { writeFileSync } = await import('node:fs');
     writeFileSync(join(home2, 'daymark.sqlite'), 'NOT_A_VALID_SQLITE_HEADER');
